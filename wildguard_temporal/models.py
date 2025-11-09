@@ -1,8 +1,11 @@
 """
 Model integrations for WildGuard-Temporal.
+
+Updated to support both OpenAI API v0.x and v1.0+
 """
 
 from typing import Callable, List, Dict, Optional
+import os
 
 
 def create_model(
@@ -80,9 +83,11 @@ def create_openai_model(
     """
     Create OpenAI model interface.
 
+    Supports both OpenAI API v0.x and v1.0+
+
     Args:
         model_name: OpenAI model name (e.g., gpt-4, gpt-3.5-turbo)
-        api_key: OpenAI API key
+        api_key: OpenAI API key (or set OPENAI_API_KEY env var)
         api_base: Custom API base URL
         temperature: Sampling temperature
 
@@ -96,30 +101,62 @@ def create_openai_model(
             "OpenAI package not installed. Install with: pip install openai"
         )
 
-    # Set API key
-    if api_key:
-        openai.api_key = api_key
-
-    if api_base:
-        openai.api_base = api_base
+    # Get API key from parameter or environment
+    api_key = api_key or os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "OpenAI API key required. Provide via --api-key or set OPENAI_API_KEY environment variable"
+        )
 
     # Default model
     if not model_name:
         model_name = "gpt-3.5-turbo"
 
-    def openai_model(conversation: List[Dict[str, str]]) -> str:
-        """Call OpenAI API with conversation history."""
-        try:
-            response = openai.ChatCompletion.create(
-                model=model_name,
-                messages=conversation,
-                temperature=temperature,
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            return f"[ERROR: OpenAI API call failed: {e}]"
+    # Check OpenAI version and use appropriate API
+    try:
+        # Try new API (v1.0+)
+        from openai import OpenAI
 
-    return openai_model
+        client = OpenAI(api_key=api_key, base_url=api_base)
+
+        def openai_model_v1(conversation: List[Dict[str, str]]) -> str:
+            """Call OpenAI API v1.0+ with conversation history."""
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=conversation,
+                    temperature=temperature,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                error_msg = f"[ERROR: OpenAI API call failed: {str(e)[:100]}]"
+                print(f"WARNING: {error_msg}")
+                return error_msg
+
+        return openai_model_v1
+
+    except (ImportError, AttributeError):
+        # Fall back to old API (v0.x)
+        if api_key:
+            openai.api_key = api_key
+        if api_base:
+            openai.api_base = api_base
+
+        def openai_model_v0(conversation: List[Dict[str, str]]) -> str:
+            """Call OpenAI API v0.x with conversation history."""
+            try:
+                response = openai.ChatCompletion.create(
+                    model=model_name,
+                    messages=conversation,
+                    temperature=temperature,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                error_msg = f"[ERROR: OpenAI API call failed: {str(e)[:100]}]"
+                print(f"WARNING: {error_msg}")
+                return error_msg
+
+        return openai_model_v0
 
 
 def create_anthropic_model(
@@ -132,7 +169,7 @@ def create_anthropic_model(
 
     Args:
         model_name: Anthropic model name (e.g., claude-3-opus-20240229)
-        api_key: Anthropic API key
+        api_key: Anthropic API key (or set ANTHROPIC_API_KEY env var)
         temperature: Sampling temperature
 
     Returns:
@@ -143,6 +180,13 @@ def create_anthropic_model(
     except ImportError:
         raise ImportError(
             "Anthropic package not installed. Install with: pip install anthropic"
+        )
+
+    # Get API key from parameter or environment
+    api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "Anthropic API key required. Provide via --api-key or set ANTHROPIC_API_KEY environment variable"
         )
 
     # Default model
@@ -173,7 +217,9 @@ def create_anthropic_model(
 
             return response.content[0].text
         except Exception as e:
-            return f"[ERROR: Anthropic API call failed: {e}]"
+            error_msg = f"[ERROR: Anthropic API call failed: {str(e)[:100]}]"
+            print(f"WARNING: {error_msg}")
+            return error_msg
 
     return anthropic_model
 
@@ -235,6 +281,8 @@ def create_huggingface_model(
             response = tokenizer.decode(outputs[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
             return response
         except Exception as e:
-            return f"[ERROR: HuggingFace generation failed: {e}]"
+            error_msg = f"[ERROR: HuggingFace generation failed: {str(e)[:100]}]"
+            print(f"WARNING: {error_msg}")
+            return error_msg
 
     return huggingface_model

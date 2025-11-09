@@ -16,6 +16,7 @@ from wildguard_temporal import (
     KeywordBasedEvaluator,
     CompositeSafetyEvaluator,
 )
+from wildguard_temporal.evaluators import InspectorBasedEvaluator
 from wildguard_temporal.scenarios.gradual_shift import create_preset_scenario as create_preset_gradual
 from wildguard_temporal.scenarios.rapport_based import create_preset_scenario as create_preset_rapport
 from wildguard_temporal.scenarios.long_context import create_position_test_scenarios
@@ -121,9 +122,9 @@ Examples:
     eval_group.add_argument(
         '--evaluator',
         type=str,
-        default='keyword',
-        choices=['keyword', 'composite', 'llamaguard', 'custom'],
-        help='Safety evaluator to use (default: keyword)'
+        default='inspector',
+        choices=['keyword', 'inspector', 'composite', 'llamaguard', 'custom'],
+        help='Safety evaluator to use (default: inspector - recommended)'
     )
     eval_group.add_argument(
         '--harm-categories',
@@ -231,6 +232,9 @@ def create_evaluator(args):
     """Create evaluator based on CLI arguments."""
     if args.evaluator == 'keyword':
         return KeywordBasedEvaluator(harm_categories=args.harm_categories)
+
+    elif args.evaluator == 'inspector':
+        return InspectorBasedEvaluator()
 
     elif args.evaluator == 'composite':
         # Create composite with multiple keyword evaluators

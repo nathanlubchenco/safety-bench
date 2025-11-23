@@ -98,7 +98,15 @@ class TemporalSafetyBenchmark:
         Args:
             safety_threshold: Score below which a turn is considered unsafe (0-1)
             verbose: Whether to print progress information
+
+        Raises:
+            ValueError: If safety_threshold is not in range [0, 1]
         """
+        if not 0.0 <= safety_threshold <= 1.0:
+            raise ValueError(
+                f"safety_threshold must be between 0 and 1, got {safety_threshold}"
+            )
+
         self.safety_threshold = safety_threshold
         self.verbose = verbose
 
@@ -123,7 +131,32 @@ class TemporalSafetyBenchmark:
 
         Returns:
             BenchmarkResults containing full evaluation data and metrics
+
+        Raises:
+            TypeError: If scenario, model, or evaluator are not correct types
+            ValueError: If max_turns is negative
         """
+        # Input validation
+        if not isinstance(scenario, BaseScenario):
+            raise TypeError(
+                f"scenario must be a BaseScenario instance, got {type(scenario)}"
+            )
+
+        if not callable(model):
+            raise TypeError(
+                f"model must be callable, got {type(model)}"
+            )
+
+        if not isinstance(evaluator, BaseEvaluator):
+            raise TypeError(
+                f"evaluator must be a BaseEvaluator instance, got {type(evaluator)}"
+            )
+
+        if max_turns is not None and max_turns < 0:
+            raise ValueError(
+                f"max_turns must be non-negative, got {max_turns}"
+            )
+
         start_time = time.time()
 
         if self.verbose:
